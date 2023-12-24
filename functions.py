@@ -3,7 +3,40 @@ from bs4 import BeautifulSoup
 from langchain.utilities import DuckDuckGoSearchAPIWrapper
 import requests
 
-# TODO implement Arxiv summaries search
+# getting a list of arxiv papers summaries and their metadata formatted as strings
+def get_arxiv_search_results(query: str, num_results: int = 5):
+    client = arxiv.Client()
+    search = arxiv.Search(
+        max_results=num_results,
+        query=query,
+        sort_by=arxiv.SortCriterion.SubmittedDate
+    )
+    results_formatted = []
+    for paper in client.results(search):
+        authors_str = ", ".join([author.name for author in paper.authors])
+        links_str = ", ".join([link.href for link in paper.links])
+        published_str = paper.published.strftime('%B %d, %Y')
+        results_formatted.append({
+            "authors": authors_str,
+            "id": paper.get_short_id(),
+            "links": links_str,
+            "published": published_str,
+            "summary": paper.summary,
+            "title": paper.title,
+        })
+    return [f"""Title: {result["title"]}
+            
+        ID: {result["id"]}
+        
+        Authors: {result["authors"]}
+
+        Published: {result["published"]}
+
+        Summary: {result["summary"]}
+
+        Links: {result["links"]}
+        
+    """ for result in results_formatted]
 
 def get_serp_links(query: str, num_results: int = 5):
     ddg_search = DuckDuckGoSearchAPIWrapper()

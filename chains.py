@@ -4,18 +4,35 @@ from langchain.chat_models import ChatOpenAI
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import RunnablePassthrough
 
-from functions import get_serp_links, scrape_webpage_text
-from prompts import report_prompt, summarization_prompt, web_search_engine_queries_prompt
+from functions import get_arxiv_search_results, get_serp_links, scrape_webpage_text
+from prompts import arxiv_search_queries_prompt, report_prompt, free_summarization_prompt, directed_summarization_prompt, web_search_engine_queries_prompt
 
-# TODO implement Arxiv chain
+# TODO implement Arxiv chains
 
+generate_arxiv_search_queries = arxiv_search_queries_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser() | json.loads
 generate_web_search_engine_queries = web_search_engine_queries_prompt  | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser() | json.loads
+
+summarize_arxiv_search_result = RunnablePassthrough.assign(
+    summary=RunnablePassthrough.assign(
+        # anonymous function that takes no arguments, and returns the output of `scrape_text`
+        content=lambda input_obj: input_obj["result"]
+    ) | free_summarization_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
+)
+
+get_and_summarize_arxiv_search_results = RunnablePassthrough.assign(
+    results=lambda input: get_arxiv_search_results(input["query"])
+) | (lambda list_of_results: [
+    {
+        "query": list_of_results["query"],
+        "result": result
+    } for result in list_of_results["results"]
+]) | summarize_arxiv_search_result.map()
 
 scrape_and_summarize_webpage = RunnablePassthrough.assign(
     summary=RunnablePassthrough.assign(
         # anonymous function that takes no arguments, and returns the output of `scrape_text`
         content=lambda input_obj: scrape_webpage_text(input_obj["url"])
-    ) | summarization_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
+    ) | directed_summarization_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
 ) | (lambda summarization_res: f"URL: {summarization_res['url']}\n\nSUMMARY: {summarization_res['summary']}")
 
 # return a list of urls based on the input query,
@@ -30,6 +47,12 @@ summarize_webpages = RunnablePassthrough.assign(
     } for link in list_of_urls["urls"]
 ]) | scrape_and_summarize_webpage.map()
 
+search_arxiv = generate_arxiv_search_queries | (lambda queries: [
+    {
+        "query": q,
+    } for q in queries
+]) | get_and_summarize_arxiv_search_results.map()
+
 # what we get here is a list of lists,
 # we basically deletegate to the LLM the generation of relevant web search engine queries,
 # then we visit each SERP result (up to provided limit) and summarize the page we've found
@@ -38,6 +61,24 @@ search_the_web = generate_web_search_engine_queries | (lambda queries: [
         "query": q,
     } for q in queries
 ]) | summarize_webpages.map()
+
+generate_arxiv_search_report = RunnablePassthrough.assign(
+    date=lambda _: datetime.now().strftime('%B %d, %Y'),
+    # joining the list of lists of search results into a string
+    summary= search_arxiv | (lambda search_results: ["\n\n".join([f"""-----------------------------------------------------------------------------------------------------------
+    ARXIV SEARCH QUERY:
+                                                                                 
+    {r['query']}
+                                                                                 
+    ARXIV SEARCH RESULT: 
+                                                                                 
+    {r['result']}
+
+    ARXIV SEARCH RESULT SUMMARY:
+
+    {r['summary']}
+    -----------------------------------------------------------------------------------------------------------""" for r in sr]) for sr in search_results])
+) | report_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
 
 generate_web_search_report = RunnablePassthrough.assign(
     date=lambda _: datetime.now().strftime('%B %d, %Y'),
