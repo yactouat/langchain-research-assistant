@@ -1,0 +1,12 @@
+arxiv
+beautifulsoup4
+duckduckgo-search
+fastapi
+langchain
+langserve
+openai
+pymupdf
+python-dotenv
+requests
+sse_starlette
+uvicorn
