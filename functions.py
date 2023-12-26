@@ -1,6 +1,10 @@
 import arxiv
 from bs4 import BeautifulSoup
+from langchain.document_loaders import PyPDFLoader
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.utilities import DuckDuckGoSearchAPIWrapper
+from langchain.vectorstores import FAISS
 import requests
 
 # getting a list of arxiv papers summaries and their metadata formatted as strings
@@ -37,6 +41,20 @@ def get_arxiv_search_results(query: str, num_results: int = 5):
         Links: {result["links"]}
         
     """ for result in results_formatted]
+
+def get_pdf_document_chunks(pdf_file_path: str, chunk_size: int = 25000):
+    """Split a PDF document into chunks of x tokens, with 50 tokens of overlap between each chunk (better for API calls)"""
+    loader = PyPDFLoader(pdf_file_path)
+    # this helper splits the document into pages
+    pages = loader.load_and_split()
+    # initializing a vectors store using the OpenAI embeddings class
+    faiss_index = FAISS.from_documents(pages, OpenAIEmbeddings())
+    # splitting the document into chunks of x tokens, with 50 tokens of overlap between each chunk (better for API calls)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=25000, chunk_overlap=50)
+    # getting the content of each page as a list of strings
+    pages_content = [page.page_content for page in pages]
+    docs = text_splitter.create_documents(pages_content)
+    return docs
 
 def get_serp_links(query: str, num_results: int = 5):
     ddg_search = DuckDuckGoSearchAPIWrapper()

@@ -4,19 +4,30 @@ from langchain.chat_models import ChatOpenAI
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import RunnablePassthrough
 
-from functions import get_arxiv_search_results, get_serp_links, scrape_webpage_text
-from prompts import arxiv_search_queries_prompt, report_prompt, free_summarization_prompt, directed_summarization_prompt, web_search_engine_queries_prompt
-
-# TODO implement Arxiv chains
+from functions import get_arxiv_search_results, get_pdf_document_chunks, get_serp_links, scrape_webpage_text
+from prompts import (
+    arxiv_search_queries_prompt,
+    report_with_query_prompt,
+    report_with_a_source_query_prompt,
+    document_summarization_prompt,
+    free_summarization_prompt,
+    directed_summarization_prompt,
+    web_search_engine_queries_prompt
+)
 
 generate_arxiv_search_queries = arxiv_search_queries_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser() | json.loads
 generate_web_search_engine_queries = web_search_engine_queries_prompt  | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser() | json.loads
 
 summarize_arxiv_search_result = RunnablePassthrough.assign(
     summary=RunnablePassthrough.assign(
-        # anonymous function that takes no arguments, and returns the output of `scrape_text`
         content=lambda input_obj: input_obj["result"]
     ) | free_summarization_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
+)
+
+summarize_pdf_result = RunnablePassthrough.assign(
+    summary=RunnablePassthrough.assign(
+        content=lambda input_obj: input_obj["result"]
+    ) | document_summarization_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
 )
 
 get_and_summarize_arxiv_search_results = RunnablePassthrough.assign(
@@ -27,6 +38,15 @@ get_and_summarize_arxiv_search_results = RunnablePassthrough.assign(
         "result": result
     } for result in list_of_results["results"]
 ]) | summarize_arxiv_search_result.map()
+
+get_and_summarize_pdf_doc = RunnablePassthrough.assign(
+    results=lambda input: get_pdf_document_chunks(input["source"])
+) | (lambda formatted_chunks: [
+    {
+        "result": chunk.page_content,
+        "source": formatted_chunks["source"],
+    } for chunk in formatted_chunks["results"]
+]) | summarize_pdf_result.map()
 
 scrape_and_summarize_webpage = RunnablePassthrough.assign(
     summary=RunnablePassthrough.assign(
@@ -78,10 +98,17 @@ generate_arxiv_search_report = RunnablePassthrough.assign(
 
     {r['summary']}
     -----------------------------------------------------------------------------------------------------------""" for r in sr]) for sr in search_results])
-) | report_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
+) | report_with_query_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
+
+generate_pdf_report = RunnablePassthrough.assign(
+    date=lambda _: datetime.now().strftime('%B %d, %Y'),
+    summary= get_and_summarize_pdf_doc | (lambda chunk_summaries: "\n\n".join([f"""-----------------------------------------------------------------------------------------------------------
+    {s}
+    -----------------------------------------------------------------------------------------------------------""" for s in chunk_summaries]))
+) | report_with_a_source_query_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
 
 generate_web_search_report = RunnablePassthrough.assign(
     date=lambda _: datetime.now().strftime('%B %d, %Y'),
     # joining the list of lists of search results into a string
     summary= search_the_web | (lambda search_results: "\n".join([f"---\n{' '.join([text for text in sr])}\n---" for sr in search_results]))
-) | report_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
+) | report_with_query_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()

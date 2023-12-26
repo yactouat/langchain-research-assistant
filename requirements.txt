@@ -1,12 +1,15 @@
 arxiv
 beautifulsoup4
 duckduckgo-search
+faiss-cpu
 fastapi
 langchain
 langserve
 openai
+pypdf
 pymupdf
 python-dotenv
 requests
 sse_starlette
+tiktoken
 uvicorn

@@ -58,6 +58,18 @@ Content:
 """
 directed_summarization_prompt = ChatPromptTemplate.from_template(directed_summarization_prompt_template)
 
+document_summarization_prompt_template = """Provide a summary based the follwing content.
+
+Your summary will ONLY be based on the provided content and WILL NOT contain any additional data from your knowledge base.
+
+-----------------------------------------------------------------------------------------------------------
+Content: 
+
+{content}
+-----------------------------------------------------------------------------------------------------------
+"""
+document_summarization_prompt = ChatPromptTemplate.from_template(document_summarization_prompt_template)
+
 free_summarization_prompt_template = """Provide a summary based the follwing content and query.
 
 Your summary will ONLY be focused on the relationship between the provided content and the provided query.
@@ -75,7 +87,25 @@ Content:
 free_summarization_prompt = ChatPromptTemplate.from_template(free_summarization_prompt_template)
 
 system_research_assistant_prompt = """"you are an AI research assistant, your job is to write objective reports with a given input summary"""
-report_prompt_template = """
+
+report_with_a_source_query_prompt_template = """
+source: {source}
+-----------------------------------------------------------------------------------------------------------
+input summary: {summary}
+-----------------------------------------------------------------------------------------------------------
+using the above input summary only and without tapping into your own knowledge, generate a comprehsive report about the input summary;
+at the top of the report should be a top-level heading saying reading "Summary of {source}";
+right below the top level heading, the date should be written in the following format: {date};
+write your answer as a structured report in Markdown with relevant headings and subheadings;
+the report should contain a table of contents at the beginning, each item in the table of contents should be a link to the relevant header in the report using only Markdown syntax for links and not HTML;
+at the end of the report, a level 2 heading of reading "Sources" should precede a bullet points list of all relevant URLs used in the report if such URLs are provided in the input summary;
+"""
+report_with_a_source_query_prompt = ChatPromptTemplate.from_messages([
+    ("system", system_research_assistant_prompt),
+    ("user", report_with_a_source_query_prompt_template)
+])
+
+report_with_query_prompt_template = """
 -----------------------------------------------------------------------------------------------------------
 input summary: {summary}
 -----------------------------------------------------------------------------------------------------------
@@ -89,9 +119,9 @@ at the end of the report, a level 2 heading of reading "Sources" should precede 
 query: {query}
 -----------------------------------------------------------------------------------------------------------
 """
-report_prompt = ChatPromptTemplate.from_messages([
+report_with_query_prompt = ChatPromptTemplate.from_messages([
     ("system", system_research_assistant_prompt),
-    ("user", report_prompt_template)
+    ("user", report_with_query_prompt_template)
 ])
 
 web_search_engine_queries_prompt_messages = [
