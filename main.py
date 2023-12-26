@@ -11,7 +11,7 @@ from chains import generate_arxiv_search_report, generate_pdf_report, generate_w
 app = FastAPI(
   title="research assistant api",
   version="1.0",
-  description="a web API that serves an AI research assistant that can generate reports by crawling the web for relevant information and summarizing it",
+  description="a web API that serves an AI research assistant that can generate reports by crawling various sources for relevant information and summarizing it",
 )
 add_routes(
     app,
