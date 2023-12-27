@@ -6,6 +6,7 @@ fastapi
 langchain
 langserve
 openai
+psycopg2-binary
 pypdf
 pymupdf
 python-dotenv

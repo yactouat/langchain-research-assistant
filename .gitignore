@@ -1,3 +1,4 @@
 .env
 __pycache__
 Mozilla-Trustworthy_AI.pdf
+prod-ca-2021.crt

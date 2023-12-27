@@ -4,7 +4,14 @@ from langchain.chat_models import ChatOpenAI
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import RunnablePassthrough
 
-from functions import get_arxiv_search_results, get_pdf_document_chunks, get_serp_links, scrape_webpage_text
+from functions import (
+    exec_static_sql_query,
+    get_arxiv_search_results, 
+    get_pdf_document_chunks,
+    get_postgre_db_schema,
+    get_serp_links, 
+    scrape_webpage_text
+)
 from prompts import (
     arxiv_search_queries_prompt,
     report_with_query_prompt,
@@ -12,10 +19,23 @@ from prompts import (
     document_summarization_prompt,
     free_summarization_prompt,
     directed_summarization_prompt,
+    sql_query_prompt,
+    sql_query_with_result_prompt,
     web_search_engine_queries_prompt
 )
 
 generate_arxiv_search_queries = arxiv_search_queries_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser() | json.loads
+
+generate_sql_query = sql_query_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
+
+generate_sql_nlp_response = RunnablePassthrough.assign(
+    db_schema=lambda _: get_postgre_db_schema()
+) | RunnablePassthrough.assign(
+    query=generate_sql_query
+) | RunnablePassthrough.assign(
+    response=lambda input_obj: exec_static_sql_query(input_obj["query"])
+) | sql_query_with_result_prompt | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser()
+
 generate_web_search_engine_queries = web_search_engine_queries_prompt  | ChatOpenAI(model="gpt-4-1106-preview") | StrOutputParser() | json.loads
 
 summarize_arxiv_search_result = RunnablePassthrough.assign(

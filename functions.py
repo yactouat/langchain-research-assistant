@@ -5,7 +5,22 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.utilities import DuckDuckGoSearchAPIWrapper
 from langchain.vectorstores import FAISS
+import os
+import psycopg2 as psycopg
 import requests
+
+def exec_static_sql_query(sql_query):
+    """
+    Runs a PostgreSQL query that has no parameters and returns the result.
+    """
+    conn_str = os.getenv('POSTGRES_CONN_STR', None)
+    conn = psycopg.connect(conn_str)
+    cur = conn.cursor()
+    cur.execute(sql_query)
+    results = cur.fetchall()
+    cur.close()
+    conn.close()
+    return results
 
 # getting a list of arxiv papers summaries and their metadata formatted as strings
 def get_arxiv_search_results(query: str, num_results: int = 5):
@@ -56,7 +71,17 @@ def get_pdf_document_chunks(pdf_file_path: str, chunk_size: int = 25000):
     docs = text_splitter.create_documents(pages_content)
     return docs
 
-def get_serp_links(query: str, num_results: int = 5):
+def get_postgre_db_schema():
+    return exec_static_sql_query("""SELECT
+        table_name,
+        column_name,
+        column_default,
+        data_type,
+        is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public'""")
+
+def get_serp_links(query: str, num_results: int = 10):
     ddg_search = DuckDuckGoSearchAPIWrapper()
     results = ddg_search.results(query, num_results)
     return [r["link"] for r in results]

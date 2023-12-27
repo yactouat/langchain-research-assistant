@@ -86,6 +86,43 @@ Content:
 """
 free_summarization_prompt = ChatPromptTemplate.from_template(free_summarization_prompt_template)
 
+sql_query_prompt_template = """Based on the table schema below, write a SQL query that would answer the user's question:
+{db_schema}
+
+Question: {question}
+
+Your output will only contain the raw SQL query, without any formatting, explanations, or pre-amble."""
+sql_query_prompt = ChatPromptTemplate.from_messages([
+    ("system", "Given an input question, convert it to a SQL query. No pre-amble."),
+    ("user", sql_query_prompt_template)
+])
+
+sql_query_with_result_set_prompt_template = """Given an input question in natural language, a SQL schema, an SQL query, and a SQL response, write a natural language response:
+NATURAL LANGUAGE QUESTION:
+
+{question}
+-----------------------------------------------------------------------------------------------------------
+SQL SCHEMA:
+
+{db_schema}
+-----------------------------------------------------------------------------------------------------------
+SQL QUERY:
+
+{query}
+-----------------------------------------------------------------------------------------------------------
+SQL RESPONSE:
+
+{response}
+"""
+sql_query_with_result_prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        "Given an input question and SQL response, convert it to a natural "
+        "language answer. No pre-amble.",
+    ),
+    ("user", sql_query_with_result_set_prompt_template)
+])
+
 system_research_assistant_prompt = """"you are an AI research assistant, your job is to write objective reports with a given input summary"""
 
 report_with_a_source_query_prompt_template = """
